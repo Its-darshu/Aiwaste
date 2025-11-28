@@ -1,114 +1,142 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from pydantic import BaseModel
 from typing import Optional
-import firebase_admin
-from firebase_admin import auth as firebase_auth
-from firebase_admin import credentials
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from .. import database, schemas
 from ..models import user as models
+from ..services.websocket import manager
+from ..services.activity import log_activity
 
 router = APIRouter()
 
-# Initialize Firebase Admin SDK
-# Note: In production, you should provide a service account key file.
-# For this demo, we'll assume the environment is configured or use default creds if available,
-# OR we might need to mock this if the user hasn't provided the service account key.
-# Since the user only provided the client config, we can't fully verify tokens server-side without the service account key.
-# HOWEVER, for a hackathon/demo, we can just trust the token's claims if we decode it, OR we can ask the user for the service account.
-# BUT, to make it work "now" without asking for more files, we can use the client-side token and just trust it (NOT SECURE) or try to verify it.
-# Let's try to initialize with default credentials. If it fails, we might need to ask the user.
-# Actually, `firebase_admin.initialize_app()` works if we don't pass creds but it expects GOOGLE_APPLICATION_CREDENTIALS env var.
+# Configuration
+SECRET_KEY = "your-secret-key-keep-it-secret" # In production, use env var
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# CRITICAL: We cannot verify Firebase tokens on the backend without the Service Account Key JSON.
-# Since the user didn't provide it, I will create a MOCK verification for now to unblock the flow.
-# In a real app, you MUST use the Admin SDK with the service account.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-# MOCKING FIREBASE ADMIN FOR DEMO PURPOSES
-class MockFirebaseAuth:
-    def verify_id_token(self, token):
-        # In a real app, this verifies the signature with Google's keys
-        # Here we just decode it blindly or assume it's valid for the demo
-        # Let's assume the frontend sends a valid token and we just extract info from it if possible,
-        # or we just trust the client sent us a valid email/uid in the body?
-        # No, the client sends the token.
-        # We can't decode the token easily without a library.
-        # Let's just assume the token IS the email for this mock if verification fails.
-        return {"uid": "mock-uid", "email": "mock@example.com"}
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
-try:
-    cred = credentials.Certificate("path/to/serviceAccountKey.json") # We don't have this
-    firebase_admin.initialize_app(cred)
-except:
-    print("Firebase Admin not initialized (missing service account). Using Mock.")
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
-class GoogleAuthRequest(BaseModel):
-    token: str
-    role: Optional[str] = "user"
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-@router.post("/auth/google", response_model=schemas.User)
-def google_auth(request: GoogleAuthRequest, db: Session = Depends(database.get_db)):
-    try:
-        # REAL VERIFICATION (Commented out because we lack service account)
-        # decoded_token = firebase_auth.verify_id_token(request.token)
-        # email = decoded_token['email']
-        # uid = decoded_token['uid']
-        
-        # MOCK VERIFICATION
-        # We will assume the token is valid and just use a mock email for now
-        # OR if the user is actually logging in, we can't get their email without verifying.
-        # This is a blocker.
-        # WAIT! The frontend can send the email/uid alongside the token for this "insecure" mode.
-        # But `verify_id_token` is the right way.
-        
-        # Let's assume for this demo that we skip verification and just create a user.
-        # I will modify the frontend to send the email too, just for this "no-backend-verification" mode.
-        # But wait, I can't modify frontend easily in this step without going back.
-        
-        # Let's try to decode the token without verification (insecure but works for demo).
-        from jose import jwt
-        # Firebase tokens are JWTs.
-        # We can decode unverified.
-        claims = jwt.get_unverified_claims(request.token)
-        email = claims.get("email")
-        uid = claims.get("sub")
-        
-    except Exception as e:
-        print(f"Token verification failed: {e}")
-        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
-
-    # Check if user exists
-    user = db.query(models.User).filter(models.User.email == email).first()
-    if not user:
-        # Create new user
-        user = models.User(
-            email=email,
-            full_name=claims.get("name", "Unknown"),
-            hashed_password="firebase-oauth-user", # Dummy
-            role=request.role
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+@router.post("/auth/signup", response_model=schemas.User)
+def signup(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    return user
+    if user.phone_number:
+        db_phone = db.query(models.User).filter(models.User.phone_number == user.phone_number).first()
+        if db_phone:
+            raise HTTPException(status_code=400, detail="Phone number already registered")
+    
+    hashed_password = get_password_hash(user.password)
+    new_user = models.User(
+        email=user.email,
+        phone_number=user.phone_number,
+        hashed_password=hashed_password,
+        full_name=user.full_name,
+        role=user.role
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    log_activity(db, "SIGNUP", f"User {new_user.email} registered", new_user.id)
+    
+    return new_user
 
-# Dependency to get current user from token (Bearer token in header)
-# The frontend sends "Bearer <firebase_token>"
-async def get_current_user(token: str = Depends(database.oauth2_scheme), db: Session = Depends(database.get_db)):
-    try:
-        # Again, decode unverified for demo
-        from jose import jwt
-        claims = jwt.get_unverified_claims(token)
-        email = claims.get("email")
-    except:
+@router.post("/auth/login", response_model=schemas.Token)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(
+        or_(models.User.email == form_data.username, models.User.phone_number == form_data.username)
+    ).first()
+    
+    if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Incorrect email/phone or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    
+    log_activity(db, "LOGIN", f"User {user.email} logged in", user.id)
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+class QRLoginRequest(BaseModel):
+    token: str
+
+@router.post("/auth/qr-login", response_model=schemas.Token)
+async def qr_login(request: QRLoginRequest, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.qr_login_token == request.token).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid QR token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    
+    # Notify admins
+    await manager.broadcast(f"Worker {user.full_name} logged in via QR code")
+    
+    log_activity(db, "QR_LOGIN", f"Worker {user.full_name} logged in via QR", user.id)
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
         
     user = db.query(models.User).filter(models.User.email == email).first()
     if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise credentials_exception
     return user
+
+@router.get("/auth/me", response_model=schemas.User)
+def read_users_me(current_user: models.User = Depends(get_current_user)):
+    return current_user
+
+@router.post("/auth/logout")
+async def logout(current_user: models.User = Depends(get_current_user), db: Session = Depends(database.get_db)):
+    await manager.broadcast(f"Worker {current_user.full_name} logged out")
+    log_activity(db, "LOGOUT", f"User {current_user.email} logged out", current_user.id)
+    return {"message": "Logged out successfully"}

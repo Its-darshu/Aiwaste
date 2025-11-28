@@ -6,6 +6,8 @@ import os
 from .. import database, schemas
 from ..models import user as models
 from ..services.ai import ai_service
+from ..services.websocket import manager
+from ..services.activity import log_activity
 from .auth import get_current_user
 
 router = APIRouter()
@@ -24,6 +26,7 @@ async def create_report(
     description: str = Form(...),
     latitude: float = Form(...),
     longitude: float = Form(...),
+    address: str = Form(None),
     file: UploadFile = File(...),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db)
@@ -42,12 +45,17 @@ async def create_report(
         description=description,
         latitude=latitude,
         longitude=longitude,
+        address=address,
         image_url=file_location,
         owner_id=current_user.id
     )
     db.add(db_report)
     db.commit()
     db.refresh(db_report)
+    
+    await manager.broadcast(f"New Task Available: {description}")
+    log_activity(db, "CREATE_REPORT", f"User {current_user.email} created report {db_report.id}", current_user.id)
+    
     return db_report
 
 @router.get("/reports/", response_model=List[schemas.Report])

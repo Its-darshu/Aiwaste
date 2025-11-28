@@ -1,6 +1,4 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { auth, googleProvider } from '../firebase';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import client from '../api/client';
 
 const AuthContext = createContext();
@@ -10,56 +8,90 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Get ID token
-        const token = await firebaseUser.getIdToken();
-        localStorage.setItem('token', token);
-        
-        // Verify with backend and get role
-        try {
-          const response = await client.post('/auth/google', { token });
-          setUser(response.data);
-        } catch (error) {
-          console.error("Backend auth failed", error);
-          // Fallback or logout?
-          // For now, let's keep the firebase user but maybe without role?
-          // Or force logout.
-          // Let's assume backend creates user if not exists.
-        }
-      } else {
+    checkUserLoggedIn();
+  }, []);
+
+  const checkUserLoggedIn = async () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const response = await client.get('/auth/me');
+        setUser(response.data);
+      } catch (error) {
+        console.error("Token invalid", error);
         localStorage.removeItem('token');
         setUser(null);
       }
-      setLoading(false);
-    });
+    }
+    setLoading(false);
+  };
 
-    return unsubscribe;
-  }, []);
-
-  const loginWithGoogle = async (role = 'user') => {
+  const login = async (email, password) => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const token = await result.user.getIdToken();
+      // OAuth2PasswordRequestForm expects form data, not JSON
+      const formData = new FormData();
+      formData.append('username', email);
+      formData.append('password', password);
+
+      const response = await client.post('/auth/login', formData);
+      const { access_token } = response.data;
       
-      // Send token and selected role to backend to create/update user
-      const response = await client.post('/auth/google', { token, role });
-      setUser(response.data);
-      return response.data;
+      localStorage.setItem('token', access_token);
+      
+      // Fetch user details immediately after login
+      const userResponse = await client.get('/auth/me');
+      setUser(userResponse.data);
+      
+      return true;
     } catch (error) {
-      console.error("Google Sign-In Error", error);
+      console.error("Login Error", error);
+      throw error;
+    }
+  };
+
+  const qrLogin = async (token) => {
+    try {
+      const response = await client.post('/auth/qr-login', { token });
+      const { access_token } = response.data;
+      localStorage.setItem('token', access_token);
+      const userResponse = await client.get('/auth/me');
+      setUser(userResponse.data);
+      return true;
+    } catch (error) {
+      console.error("QR Login Error", error);
+      throw error;
+    }
+  };
+
+  const signup = async (email, password, fullName, role, phoneNumber) => {
+    try {
+      await client.post('/auth/signup', { 
+        email, 
+        password, 
+        full_name: fullName, 
+        role,
+        phone_number: phoneNumber
+      });
+      // Auto login after signup
+      await login(email, password);
+    } catch (error) {
+      console.error("Signup Error", error);
       throw error;
     }
   };
 
   const logout = async () => {
-    await signOut(auth);
+    try {
+        await client.post('/auth/logout');
+    } catch (e) {
+        console.error("Logout notify failed", e);
+    }
     localStorage.removeItem('token');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loginWithGoogle, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, qrLogin, loading }}>
       {children}
     </AuthContext.Provider>
   );

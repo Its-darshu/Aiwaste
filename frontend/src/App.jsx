@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
+import WorkerLogin from './pages/WorkerLogin';
+import AdminLogin from './pages/AdminLogin';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -20,7 +22,7 @@ const Navigation = () => {
             </div>
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-4">
-                <Link to="/" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
+                <Link to="/dashboard" className="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
               </div>
             </div>
           </div>
@@ -44,8 +46,18 @@ const AppContent = () => {
       <Navigation />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/workers" element={<WorkerLogin />} />
+        <Route path="/admin" element={<AdminLogin />} />
         <Route
           path="/"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />

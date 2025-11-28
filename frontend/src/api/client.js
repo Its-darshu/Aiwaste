@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const client = axios.create({
-  baseURL: 'http://localhost:8000', // Direct to backend for dev, or /api via nginx
+  baseURL: '', // Use relative path to leverage Vite proxy
 });
 
 client.interceptors.request.use((config) => {

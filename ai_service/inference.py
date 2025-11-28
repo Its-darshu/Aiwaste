@@ -59,11 +59,18 @@ class InferenceService:
             return False
 
     def _predict_array(self, img_array):
+        # Filter out dark images (noise/empty camera)
+        brightness = np.mean(img_array)
+        if brightness < 40: # Threshold for darkness (0-255)
+            print(f"Image too dark (brightness: {brightness:.2f}). Ignoring.")
+            return False
+
         img_array = np.expand_dims(img_array, axis=0)
         img_array /= 255.0
 
         prediction = self.model.predict(img_array)
-        is_garbage = prediction[0][0] > 0.5
+        # Increased threshold to 0.85 to reduce false positives
+        is_garbage = prediction[0][0] > 0.85
         print(f"Prediction: {prediction[0][0]} -> {'Garbage' if is_garbage else 'Clean'}")
         return bool(is_garbage)
 

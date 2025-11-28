@@ -4,8 +4,10 @@ sqlalchemy
 pydantic
 python-multipart
 python-jose[cryptography]
-passlib[bcrypt]
+passlib
+bcrypt==3.2.2
+numpy<2
+tensorflow
 pillow
 geopy
-firebase-admin
 email-validator

@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
 from fastapi.staticfiles import StaticFiles
 from .api import auth, reports, tasks, admin
+from .services.websocket import manager
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -14,10 +15,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # CORS Configuration
 origins = [
-    "http://localhost",
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:80",
+    "*"
 ]
 
 app.add_middleware(
@@ -32,6 +30,17 @@ app.include_router(auth.router, tags=["Authentication"])
 app.include_router(reports.router, tags=["Reports"])
 app.include_router(tasks.router, tags=["Tasks"])
 app.include_router(admin.router, tags=["Admin"])
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    await manager.broadcast("STATS_UPDATE")
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        await manager.broadcast("STATS_UPDATE")
 
 @app.get("/")
 def read_root():

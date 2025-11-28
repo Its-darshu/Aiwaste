@@ -30,16 +30,30 @@ const UserDashboard = () => {
   const getLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          setLocation({ latitude, longitude });
+          
+          // Reverse Geocoding using Google Maps API
+          // Replace 'YOUR_GOOGLE_MAPS_API_KEY' with your actual API key
+          const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY'; 
+          if (GOOGLE_MAPS_API_KEY !== 'YOUR_GOOGLE_MAPS_API_KEY') {
+            try {
+              const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`);
+              const data = await response.json();
+              if (data.results && data.results.length > 0) {
+                setLocation(prev => ({ ...prev, address: data.results[0].formatted_address }));
+              }
+            } catch (error) {
+              console.error("Error fetching address", error);
+            }
+          }
         },
         (error) => {
           console.error("Error getting location", error);
           setMessage("Could not get location. Please enable GPS.");
-        }
+        },
+        { enableHighAccuracy: true }
       );
     } else {
       setMessage("Geolocation is not supported by this browser.");
@@ -77,7 +91,11 @@ const UserDashboard = () => {
       }, 100);
     } catch (err) {
       console.error("Error accessing camera:", err);
-      setMessage("Error accessing camera. Please ensure permissions are granted.");
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          alert("Camera permission denied. Please allow camera access in your browser settings.");
+      } else {
+          setMessage("Error accessing camera. Please ensure permissions are granted.");
+      }
       setIsCameraOpen(false);
       isCameraOpenRef.current = false;
     }
@@ -129,7 +147,7 @@ const UserDashboard = () => {
           const isGarbage = response.data.is_garbage;
           
           setIsGarbageDetected(isGarbage);
-          setPredictionLabel(isGarbage ? "Garbage Detected! You can snap now." : "No Garbage Detected.");
+          setPredictionLabel(isGarbage ? "Garbage Detected! You can snap now." : "");
         } catch (error) {
           console.error("Prediction error", error);
         } finally {
@@ -179,6 +197,9 @@ const UserDashboard = () => {
     formData.append('description', description);
     formData.append('latitude', location.latitude);
     formData.append('longitude', location.longitude);
+    if (location.address) {
+      formData.append('address', location.address);
+    }
     formData.append('file', file);
 
     try {
@@ -230,7 +251,7 @@ const UserDashboard = () => {
 
                 {isCameraOpen && (
                   <div className="relative">
-                    <div className="flex justify-center bg-black rounded-md overflow-hidden relative">
+                    <div className={`flex justify-center bg-black rounded-md overflow-hidden relative border-4 transition-colors duration-300 ${isGarbageDetected ? 'border-green-500' : 'border-red-500'}`}>
                       <video 
                         ref={videoRef} 
                         autoPlay 
@@ -244,9 +265,11 @@ const UserDashboard = () => {
                       />
                     </div>
                     
-                    <div className={`absolute top-2 left-2 px-2 py-1 rounded text-white text-sm ${isGarbageDetected ? 'bg-green-600' : 'bg-red-600'}`}>
-                      {isDetecting ? "Checking..." : (predictionLabel || "Initializing...")}
-                    </div>
+                    {predictionLabel && (
+                      <div className={`absolute top-2 left-2 px-2 py-1 rounded text-white text-sm ${isGarbageDetected ? 'bg-green-600' : 'bg-red-600'}`}>
+                        {predictionLabel}
+                      </div>
+                    )}
 
                     <div className="mt-2 flex justify-center space-x-2">
                       <button
@@ -289,9 +312,10 @@ const UserDashboard = () => {
             </div>
 
             {location && (
-              <p className="text-sm text-gray-500">
-                Location: {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
-              </p>
+              <div className="text-sm text-gray-500">
+                <p>Location: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</p>
+                {location.address && <p className="mt-1">Address: {location.address}</p>}
+              </div>
             )}
 
             {message && <p className={`text-sm ${message.includes('success') ? 'text-green-600' : 'text-red-600'}`}>{message}</p>}
@@ -314,7 +338,7 @@ const UserDashboard = () => {
             {reports.map((report) => (
               <li key={report.id} className="py-4">
                 <div className="flex space-x-3">
-                  <img className="h-10 w-10 rounded-full object-cover" src={`http://localhost:8000/${report.image_url}`} alt="" />
+                  <img className="h-10 w-10 rounded-full object-cover" src={`/${report.image_url}`} alt="" />
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium">{report.description}</h3>

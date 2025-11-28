@@ -16,48 +16,106 @@ def test_read_main():
     assert response.json() == {"message": "Welcome to Smart Waste Management API"}
 
 def test_auth_flow():
-    # 1. Login with Google (Mock token)
-    # We need to mock the verify_id_token or the jwt decode in auth.py
-    # But since we implemented a "skip verification" for demo, we can just send a dummy token
-    # that decodes to something valid if we use a library to sign it, OR
-    # we can rely on the fact that our auth.py just decodes without verify.
-    
-    # Let's create a dummy JWT
-    from jose import jwt
-    token = jwt.encode({"email": "test@example.com", "sub": "test-uid", "name": "Test User"}, "secret", algorithm="HS256")
-    
-    response = client.post("/auth/google", json={"token": token, "role": "user"})
+    # 1. Signup
+    signup_data = {
+        "email": "test@example.com",
+        "password": "password123",
+        "full_name": "Test User",
+        "role": "user"
+    }
+    response = client.post("/auth/signup", json=signup_data)
+    # If user already exists from previous run, it might fail with 400, which is fine for this simple test check
+    if response.status_code != 400:
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == "test@example.com"
+        assert "id" in data
+
+    # 2. Login
+    login_data = {
+        "username": "test@example.com",
+        "password": "password123"
+    }
+    response = client.post("/auth/login", data=login_data)
     assert response.status_code == 200
-    data = response.json()
-    assert data["email"] == "test@example.com"
-    assert "id" in data
+    token_data = response.json()
+    assert "access_token" in token_data
+    assert token_data["token_type"] == "bearer"
     
-    # 2. Get Current User
-    # We need to pass the SAME token as Bearer
+    token = token_data["access_token"]
+    
+    # 3. Get Me
     headers = {"Authorization": f"Bearer {token}"}
-    response = client.get("/users/me", headers=headers)
+    response = client.get("/auth/me", headers=headers)
+    assert response.status_code == 200
+    user_data = response.json()
+    assert user_data["email"] == "test@example.com"
     assert response.status_code == 200
     assert response.json()["email"] == "test@example.com"
 
 def test_report_flow():
     # Login first
-    from jose import jwt
-    token = jwt.encode({"email": "reporter@example.com", "sub": "reporter-uid", "name": "Reporter"}, "secret", algorithm="HS256")
-    client.post("/auth/google", json={"token": token, "role": "user"})
-    headers = {"Authorization": f"Bearer {token}"}
+    # Ensure user exists (signup if needed, or just use the one from test_auth_flow if order is guaranteed, but better to be safe)
+    signup_data = {
+        "email": "reporter@example.com",
+        "password": "password123",
+        "full_name": "Reporter",
+        "role": "user"
+    }
+    client.post("/auth/signup", json=signup_data)
     
+    login_data = {
+        "username": "reporter@example.com",
+        "password": "password123"
+    }
+    response = client.post("/auth/login", data=login_data)
+    token = response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
     # Create Report
     # We need to upload a file
-    with open("ai_service/dataset/clean/clean_0.jpg", "rb") as f: # Use a real file from dataset
-        # Wait, we might not know the exact name. Let's create a dummy file.
-        files = {"file": ("test.jpg", b"fake image content", "image/jpeg")}
-        data = {
-            "description": "Test Garbage",
-            "latitude": "12.9716",
-            "longitude": "77.5946"
-        }
-        # Note: We mocked ai_service.detect_garbage to return True
-        response = client.post("/reports/", data=data, files=files, headers=headers)
+    # Create a dummy file content
+    files = {"file": ("test.jpg", b"fake image content", "image/jpeg")}
+    data = {
+        "description": "Test Garbage",
+        "latitude": "12.9716",
+        "longitude": "77.5946"
+    }
+    # Note: We mocked ai_service.detect_garbage to return True
+    response = client.post("/reports/", data=data, files=files, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["description"] == "Test Garbage"
+
+def test_phone_auth_flow():
+    # 1. Signup with phone
+    signup_data = {
+        "email": "phoneuser@example.com",
+        "password": "password123",
+        "full_name": "Phone User",
+        "role": "user",
+        "phone_number": "1234567890"
+    }
+    response = client.post("/auth/signup", json=signup_data)
+    if response.status_code != 400:
         assert response.status_code == 200
-        assert response.json()["description"] == "Test Garbage"
+        data = response.json()
+        assert data["phone_number"] == "1234567890"
+
+    # 2. Login with Phone
+    login_data = {
+        "username": "1234567890",
+        "password": "password123"
+    }
+    response = client.post("/auth/login", data=login_data)
+    assert response.status_code == 200
+    token_data = response.json()
+    assert "access_token" in token_data
+
+    # 3. Login with Email (same user)
+    login_data_email = {
+        "username": "phoneuser@example.com",
+        "password": "password123"
+    }
+    response = client.post("/auth/login", data=login_data_email)
+    assert response.status_code == 200
 

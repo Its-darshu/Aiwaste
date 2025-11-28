@@ -6,6 +6,7 @@ from .models.user import UserRole, ReportStatus
 class UserBase(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
+    phone_number: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -14,6 +15,7 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: int
     role: UserRole
+    qr_login_token: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -29,6 +31,7 @@ class ReportBase(BaseModel):
     description: str
     latitude: float
     longitude: float
+    address: Optional[str] = None
 
 class ReportCreate(ReportBase):
     pass
@@ -43,5 +46,20 @@ class Report(ReportBase):
     cleanup_image_url: Optional[str] = None
     cleanup_time: Optional[datetime] = None
 
+    class Config:
+        from_attributes = True
+
+class ActivityLogBase(BaseModel):
+    action: str
+    details: Optional[str] = None
+
+class ActivityLogCreate(ActivityLogBase):
+    user_id: Optional[int] = None
+
+class ActivityLog(ActivityLogBase):
+    id: int
+    timestamp: datetime
+    user_id: Optional[int] = None
+    
     class Config:
         from_attributes = True

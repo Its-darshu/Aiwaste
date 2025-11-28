@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 from fastapi.security import OAuth2PasswordBearer
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./waste.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./waste_v2.db"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
