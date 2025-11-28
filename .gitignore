@@ -36,6 +36,7 @@ test_output.txt
 
 # Mac / Windows system files
 *.swp
+*.pem
 
 # Model files (Uncomment if you want to exclude models, or use Git LFS)
 # ai_service/models/*.h5

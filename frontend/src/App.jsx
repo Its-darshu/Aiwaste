@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
+import LandingPage from './pages/LandingPage';
 import WorkerLogin from './pages/WorkerLogin';
 import AdminLogin from './pages/AdminLogin';
 import Dashboard from './pages/Dashboard';
@@ -63,9 +64,9 @@ const AppContent = () => {
       }
     } else {
       // Main domain (ecosnap.me) - Users
-      if (location.pathname === '/') {
-        navigate('/login');
-      }
+      // if (location.pathname === '/') {
+      //   navigate('/login');
+      // }
     }
   }, [navigate, location]);
 
@@ -73,17 +74,9 @@ const AppContent = () => {
     <>
       <Navigation />
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/workers" element={<WorkerLogin />} />
         <Route path="/admin" element={<AdminLogin />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/dashboard"
           element={
