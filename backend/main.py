@@ -1,9 +1,11 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from .database import engine, Base
 from fastapi.staticfiles import StaticFiles
 from .api import auth, reports, tasks, admin
 from .services.websocket import manager
+import os
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -11,7 +13,12 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Smart Waste Management System")
 
 # Mount uploads directory
+os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# Mount frontend static files if they exist (Production mode)
+if os.path.exists("frontend/dist/assets"):
+    app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
 
 # CORS Configuration
 origins = [
@@ -42,6 +49,14 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
         await manager.broadcast("STATS_UPDATE")
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to Smart Waste Management API"}
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    # Serve specific files from dist root (like favicon.ico)
+    if full_path and os.path.exists(f"frontend/dist/{full_path}"):
+        return FileResponse(f"frontend/dist/{full_path}")
+    
+    # Serve index.html for all other routes (SPA)
+    if os.path.exists("frontend/dist/index.html"):
+        return FileResponse("frontend/dist/index.html")
+    
+    return {"message": "Frontend not built. Run 'npm run build' in frontend directory."}

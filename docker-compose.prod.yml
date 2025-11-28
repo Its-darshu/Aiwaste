@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: waste_app
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./waste_v2.db:/app/waste_v2.db

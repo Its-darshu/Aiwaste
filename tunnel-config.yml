@@ -1,0 +1,21 @@
+# This is a template configuration for your Cloudflare Tunnel
+# You will need to replace <Tunnel-UUID> with the ID you get after creating the tunnel
+
+tunnel: 297baa72-6d1e-48bf-b848-e294c04c48a6
+credentials-file: C:\Users\Darshan\.cloudflared\297baa72-6d1e-48bf-b848-e294c04c48a6.json
+
+ingress:
+  # Worker Subdomain
+  - hostname: worker.ecosnap.me
+    service: http://localhost:8080
+  
+  # Admin Subdomain
+  - hostname: admin.ecosnap.me
+    service: http://localhost:8080
+  
+  # User (Root Domain)
+  - hostname: ecosnap.me
+    service: http://localhost:8080
+    
+  # Default catch-all
+  - service: http://localhost:8080

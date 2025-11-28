@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import WorkerLogin from './pages/WorkerLogin';
@@ -41,6 +41,34 @@ const Navigation = () => {
 };
 
 const AppContent = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    // Check if we are on a subdomain (e.g., worker.saaf.com)
+    // This logic assumes the format: subdomain.domain.com
+    const parts = hostname.split('.');
+    
+    // Subdomain Routing Logic
+    if (hostname.startsWith('worker')) {
+      // Workers should only see the worker login page, not the user login
+      if (location.pathname === '/' || location.pathname === '/login') {
+        navigate('/workers');
+      }
+    } else if (hostname.startsWith('admin')) {
+      // Admins should only see the admin login page
+      if (location.pathname === '/' || location.pathname === '/login') {
+        navigate('/admin');
+      }
+    } else {
+      // Main domain (ecosnap.me) - Users
+      if (location.pathname === '/') {
+        navigate('/login');
+      }
+    }
+  }, [navigate, location]);
+
   return (
     <>
       <Navigation />
