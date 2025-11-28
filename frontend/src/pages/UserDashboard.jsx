@@ -13,10 +13,13 @@ const UserDashboard = () => {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isGarbageDetected, setIsGarbageDetected] = useState(false);
   const [predictionLabel, setPredictionLabel] = useState('');
+  const [isDetecting, setIsDetecting] = useState(false);
+  
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  const intervalRef = useRef(null);
+  const isCameraOpenRef = useRef(false);
+  const detectionLoopRef = useRef(null);
 
   useEffect(() => {
     fetchReports();
@@ -54,6 +57,7 @@ const UserDashboard = () => {
 
   const startCamera = async () => {
     setIsCameraOpen(true);
+    isCameraOpenRef.current = true;
     setFile(null);
     setMessage('');
     try {
@@ -61,15 +65,21 @@ const UserDashboard = () => {
         video: { facingMode: 'environment' } 
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      // Start prediction loop
-      intervalRef.current = setInterval(detectFrame, 1000);
+      
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current.play();
+            detectFrame();
+          };
+        }
+      }, 100);
     } catch (err) {
       console.error("Error accessing camera:", err);
       setMessage("Error accessing camera. Please ensure permissions are granted.");
       setIsCameraOpen(false);
+      isCameraOpenRef.current = false;
     }
   };
 
@@ -78,48 +88,77 @@ const UserDashboard = () => {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (detectionLoopRef.current) {
+      clearTimeout(detectionLoopRef.current);
+      detectionLoopRef.current = null;
     }
     setIsCameraOpen(false);
+    isCameraOpenRef.current = false;
     setPredictionLabel('');
+    setIsDetecting(false);
   };
 
   const detectFrame = async () => {
-    if (!videoRef.current || !canvasRef.current || !streamRef.current) return;
+    if (!videoRef.current || !canvasRef.current || !isCameraOpenRef.current) return;
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
     
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      // Prepare canvas for capture
+      canvas.width = 224; // Resize to model input size for speed
+      canvas.height = 224;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Center crop to square
+      const minDim = Math.min(video.videoWidth, video.videoHeight);
+      const startX = (video.videoWidth - minDim) / 2;
+      const startY = (video.videoHeight - minDim) / 2;
+      ctx.drawImage(video, startX, startY, minDim, minDim, 0, 0, 224, 224);
       
       canvas.toBlob(async (blob) => {
-        if (!blob) return;
+        if (!blob || !isCameraOpenRef.current) return;
+        
+        setIsDetecting(true);
         const formData = new FormData();
         formData.append('file', blob, 'frame.jpg');
         
         try {
+          // Send to backend for prediction using YOUR trained model
           const response = await client.post('/reports/predict', formData);
           const isGarbage = response.data.is_garbage;
+          
           setIsGarbageDetected(isGarbage);
           setPredictionLabel(isGarbage ? "Garbage Detected! You can snap now." : "No Garbage Detected.");
         } catch (error) {
           console.error("Prediction error", error);
+        } finally {
+          setIsDetecting(false);
+          // Schedule next detection
+          if (isCameraOpenRef.current) {
+            detectionLoopRef.current = setTimeout(detectFrame, 500); // Check every 500ms
+          }
         }
-      }, 'image/jpeg', 0.7);
+      }, 'image/jpeg', 0.6);
+    } else {
+      // Video not ready, retry soon
+      if (isCameraOpenRef.current) {
+        detectionLoopRef.current = setTimeout(detectFrame, 100);
+      }
     }
   };
 
   const captureImage = (e) => {
     e.preventDefault();
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current) return;
     
-    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
     canvas.toBlob((blob) => {
       const capturedFile = new File([blob], "capture.jpg", { type: "image/jpeg" });
       setFile(capturedFile);
@@ -191,27 +230,32 @@ const UserDashboard = () => {
 
                 {isCameraOpen && (
                   <div className="relative">
-                    <video 
-                      ref={videoRef} 
-                      autoPlay 
-                      playsInline 
-                      muted
-                      className="w-full h-64 object-cover rounded-md bg-black"
-                    />
-                    <canvas ref={canvasRef} className="hidden" />
+                    <div className="flex justify-center bg-black rounded-md overflow-hidden relative">
+                      <video 
+                        ref={videoRef} 
+                        autoPlay 
+                        playsInline 
+                        muted
+                        className="max-w-full max-h-[400px] w-auto h-auto object-contain"
+                      />
+                      <canvas 
+                        ref={canvasRef} 
+                        className="hidden"
+                      />
+                    </div>
                     
                     <div className={`absolute top-2 left-2 px-2 py-1 rounded text-white text-sm ${isGarbageDetected ? 'bg-green-600' : 'bg-red-600'}`}>
-                      {predictionLabel || "Initializing..."}
+                      {isDetecting ? "Checking..." : (predictionLabel || "Initializing...")}
                     </div>
 
-                    <div className="mt-2 flex space-x-2">
+                    <div className="mt-2 flex justify-center space-x-2">
                       <button
                         type="button"
                         onClick={captureImage}
                         disabled={!isGarbageDetected}
-                        className={`px-4 py-2 rounded-md text-white ${isGarbageDetected ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
+                        className={`px-4 py-2 rounded-md text-white transition-colors ${isGarbageDetected ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
                       >
-                        Snap Photo
+                        {isGarbageDetected ? 'Snap Photo' : 'Detecting Garbage...'}
                       </button>
                       <button
                         type="button"
