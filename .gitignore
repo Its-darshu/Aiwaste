@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Databases, uploads and other generated files
+waste.db
+uploads/
+ai_service/dataset/
+backend/__pycache__/
+frontend/node_modules/
+
+# Frontend dev artifacts
+frontend/dist/
+frontend/build/
+frontend/.env.local
+
+# Logs and test outputs
+*.log
+test_output.txt
+
+# Mac / Windows system files
+*.swp
+
+# Model files (Uncomment if you want to exclude models, or use Git LFS)
+# ai_service/models/*.h5
