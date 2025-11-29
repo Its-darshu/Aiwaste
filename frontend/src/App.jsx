@@ -76,6 +76,7 @@ const AppContent = () => {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/workers" element={<WorkerLogin />} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route
           path="/dashboard"
