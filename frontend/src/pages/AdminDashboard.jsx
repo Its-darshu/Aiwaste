@@ -62,7 +62,8 @@ const AdminDashboard = () => {
       fetchData();
     } catch (error) {
       console.error("Failed to create worker", error);
-      alert("Failed to create worker");
+      const message = error.response?.data?.detail || "Failed to create worker";
+      alert(message);
     }
   };
 

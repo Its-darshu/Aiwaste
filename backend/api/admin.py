@@ -68,9 +68,20 @@ def read_all_reports(
 @router.post("/admin/workers", response_model=schemas.User)
 def create_worker(user: schemas.UserCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(database.get_db)):
     check_admin(current_user)
-    db_user = db.query(models.User).filter(models.User.email == user.email).first()
-    if db_user:
+    
+    # Check email uniqueness
+    if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Handle phone number
+    phone_number = user.phone_number
+    if phone_number:
+        # Check phone number uniqueness if provided
+        if db.query(models.User).filter(models.User.phone_number == phone_number).first():
+            raise HTTPException(status_code=400, detail="Phone number already registered")
+    else:
+        # Convert empty string to None to avoid unique constraint violation
+        phone_number = None
     
     hashed_password = get_password_hash(user.password)
     # Generate QR token
@@ -80,7 +91,7 @@ def create_worker(user: schemas.UserCreate, current_user: models.User = Depends(
         email=user.email,
         hashed_password=hashed_password,
         full_name=user.full_name,
-        phone_number=user.phone_number,
+        phone_number=phone_number,
         role=models.UserRole.WORKER,
         qr_login_token=qr_token
     )
