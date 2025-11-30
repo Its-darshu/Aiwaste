@@ -39,15 +39,51 @@ jobs:
         key: ${{ secrets.AWS_SSH_KEY }}
         port: 22
         script: |
-          # Navigate to project directory (Update this path if your repo is cloned elsewhere)
-          cd ~/waste || cd /var/www/waste || exit 1
+          set -e # Stop script on error
           
-          # Pull latest changes
-          git pull origin main
+          echo "Starting deployment..."
           
-          # Rebuild and restart containers
-          # The new Dockerfile handles the frontend build automatically
-          docker-compose -f docker-compose.prod.yml up --build -d
+          # 1. Find the project directory
+          # Try common locations or assume home directory contains the repo name
+          TARGET_DIR=""
+          for dir in "$HOME/waste" "$HOME/Aiwaste" "/var/www/waste" "/var/www/Aiwaste"; do
+            if [ -d "$dir" ]; then
+              TARGET_DIR="$dir"
+              break
+            fi
+          done
           
-          # Cleanup unused images to save space
-          docker image prune -f
+          if [ -z "$TARGET_DIR" ]; then
+            echo "Error: Could not find project directory. Please ensure the repo is cloned in $HOME/waste or similar."
+            exit 1
+          fi
+          
+          echo "Found project at: $TARGET_DIR"
+          cd "$TARGET_DIR"
+          
+          # 2. Update Code (Force Clean)
+          echo "Pulling latest code..."
+          git fetch --all
+          git reset --hard origin/main
+          
+          # 3. Determine Docker Compose Command
+          if command -v docker-compose &> /dev/null; then
+            DOCKER_COMPOSE="docker-compose"
+          else
+            DOCKER_COMPOSE="docker compose"
+          fi
+          
+          # 4. Rebuild and Restart
+          echo "Rebuilding containers..."
+          # Use sudo if user is not in docker group
+          if groups | grep -q "docker"; then
+            $DOCKER_COMPOSE -f docker-compose.prod.yml down --remove-orphans
+            $DOCKER_COMPOSE -f docker-compose.prod.yml up --build -d
+            docker image prune -f
+          else
+            sudo $DOCKER_COMPOSE -f docker-compose.prod.yml down --remove-orphans
+            sudo $DOCKER_COMPOSE -f docker-compose.prod.yml up --build -d
+            sudo docker image prune -f
+          fi
+          
+          echo "Deployment successful!"
