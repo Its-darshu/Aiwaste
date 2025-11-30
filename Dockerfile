@@ -1,3 +1,12 @@
+# Stage 1: Build Frontend
+FROM node:18-alpine as frontend-build
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Build Backend & Serve
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -12,7 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy Source Code (Preserving Directory Structure)
 COPY backend/ backend/
 COPY ai_service/ ai_service/
-COPY frontend/dist/ frontend/dist/
+# Copy built assets from Stage 1
+COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 
 # Create uploads directory
 RUN mkdir -p uploads
