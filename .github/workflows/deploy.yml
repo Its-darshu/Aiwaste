@@ -46,18 +46,17 @@ jobs:
         key: ${{ secrets.AWS_SSH_KEY }}
         port: 22
         debug: true
-        timeout: 30s
+        timeout: 60s
         command_timeout: 30m
         script: |
           set -e # Stop script on error
+          export TERM=xterm
           
           echo "Starting deployment..."
           
           # 1. Find the project directory
-          # Try common locations or assume home directory contains the repo name
           TARGET_DIR=""
-          # Debug: List directories in Home to help troubleshoot
-          echo "Listing directories in $HOME:"
+          # Debug: List directories in Home
           ls -d $HOME/*/ || echo "No directories found in $HOME"
           
           for dir in "$HOME/waste" "$HOME/Aiwaste" "/var/www/waste" "/var/www/Aiwaste"; do
@@ -84,8 +83,11 @@ jobs:
           echo "Found project at: $TARGET_DIR"
           cd "$TARGET_DIR"
           
-          # 2. Update Code (Force Clean)
+          # 2. Update Code
           echo "Pulling latest code..."
+          # Fix for 'dubious ownership' error if user doesn't own the dir
+          git config --global --add safe.directory "$TARGET_DIR" || true
+          
           git fetch --all
           git reset --hard origin/main
           
@@ -96,17 +98,22 @@ jobs:
             DOCKER_COMPOSE="docker compose"
           fi
           
-          # 4. Rebuild and Restart
-          echo "Rebuilding containers..."
-          # Use sudo if user is not in docker group
-          if groups | grep -q "docker"; then
-            $DOCKER_COMPOSE -f docker-compose.prod.yml down --remove-orphans
-            $DOCKER_COMPOSE -f docker-compose.prod.yml up --build -d
-            docker image prune -f
+          # 4. Check Docker Permissions (Avoid hanging on sudo password)
+          if docker info > /dev/null 2>&1; then
+            echo "Running docker without sudo..."
+            CMD_PREFIX=""
+          elif sudo -n docker info > /dev/null 2>&1; then
+            echo "Running docker with sudo..."
+            CMD_PREFIX="sudo"
           else
-            sudo $DOCKER_COMPOSE -f docker-compose.prod.yml down --remove-orphans
-            sudo $DOCKER_COMPOSE -f docker-compose.prod.yml up --build -d
-            sudo docker image prune -f
+            echo "Error: Docker cannot be run. User is not in 'docker' group and passwordless sudo is not available."
+            exit 1
           fi
+          
+          # 5. Rebuild and Restart
+          echo "Rebuilding containers..."
+          $CMD_PREFIX $DOCKER_COMPOSE -f docker-compose.prod.yml down --remove-orphans
+          $CMD_PREFIX $DOCKER_COMPOSE -f docker-compose.prod.yml up --build -d
+          $CMD_PREFIX docker image prune -f
           
           echo "Deployment successful!"
