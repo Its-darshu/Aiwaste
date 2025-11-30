@@ -49,71 +49,56 @@ jobs:
         timeout: 60s
         command_timeout: 30m
         script: |
-          set -e # Stop script on error
-          export TERM=xterm
+          set -e
           
-          echo "Starting deployment..."
+          # Configuration
+          REPO_URL="https://github.com/${{ github.repository }}.git"
+          PROJECT_DIR="$HOME/Aiwaste"
           
-          # 1. Find the project directory
-          TARGET_DIR=""
-          # Debug: List directories in Home
-          ls -d $HOME/*/ || echo "No directories found in $HOME"
+          echo "Starting deployment to $PROJECT_DIR..."
           
-          for dir in "$HOME/waste" "$HOME/Aiwaste" "/var/www/waste" "/var/www/Aiwaste"; do
-            if [ -d "$dir" ]; then
-              TARGET_DIR="$dir"
-              break
-            fi
-          done
-          
-          # Fallback: Try to find directory containing docker-compose.prod.yml
-          if [ -z "$TARGET_DIR" ]; then
-             echo "Standard paths failed. Searching for docker-compose.prod.yml..."
-             FOUND_PATH=$(find $HOME -name "docker-compose.prod.yml" -print -quit)
-             if [ -n "$FOUND_PATH" ]; then
-               TARGET_DIR=$(dirname "$FOUND_PATH")
-             fi
+          # 1. Ensure Project Directory Exists
+          if [ -d "$PROJECT_DIR" ]; then
+            echo "Directory exists. Updating..."
+            cd "$PROJECT_DIR"
+            
+            # Handle 'dubious ownership' if permissions are mixed
+            git config --global --add safe.directory "$PROJECT_DIR" || true
+            
+            # Reset any local changes
+            git fetch origin
+            git reset --hard origin/main
+          else
+            echo "Directory not found. Cloning..."
+            # Try cloning. If this is a private repo, this might fail without credentials.
+            git clone "$REPO_URL" "$PROJECT_DIR"
+            cd "$PROJECT_DIR"
           fi
           
-          if [ -z "$TARGET_DIR" ]; then
-            echo "Error: Could not find project directory. Please ensure the repo is cloned."
-            exit 1
-          fi
-          
-          echo "Found project at: $TARGET_DIR"
-          cd "$TARGET_DIR"
-          
-          # 2. Update Code
-          echo "Pulling latest code..."
-          # Fix for 'dubious ownership' error if user doesn't own the dir
-          git config --global --add safe.directory "$TARGET_DIR" || true
-          
-          git fetch --all
-          git reset --hard origin/main
-          
-          # 3. Determine Docker Compose Command
+          # 2. Determine Docker Compose Command
           if command -v docker-compose &> /dev/null; then
-            DOCKER_COMPOSE="docker-compose"
+            COMPOSE_CMD="docker-compose"
           else
-            DOCKER_COMPOSE="docker compose"
+            COMPOSE_CMD="docker compose"
           fi
           
-          # 4. Check Docker Permissions (Avoid hanging on sudo password)
+          # 3. Determine Sudo Usage
+          # Check if we can run docker without sudo
           if docker info > /dev/null 2>&1; then
-            echo "Running docker without sudo..."
-            CMD_PREFIX=""
+            SUDO=""
+            echo "Running Docker as current user."
           elif sudo -n docker info > /dev/null 2>&1; then
-            echo "Running docker with sudo..."
-            CMD_PREFIX="sudo"
+            SUDO="sudo"
+            echo "Running Docker with sudo."
           else
-            echo "Error: Docker cannot be run. User is not in 'docker' group and passwordless sudo is not available."
+            echo "Error: Cannot run Docker. User is not in 'docker' group and passwordless sudo is unavailable."
             exit 1
           fi
           
-          # 5. Rebuild and Restart
+          # 4. Deploy
           echo "Rebuilding containers..."
-          $CMD_PREFIX $DOCKER_COMPOSE -f docker-compose.prod.yml down --remove-orphans
-          $CMD_PREFIX $DOCKER_COMPOSE -f docker-compose.prod.yml up --build -d
-          $CMD_PREFIX docker image prune -f
+          $SUDO $COMPOSE_CMD -f docker-compose.prod.yml down --remove-orphans
+          $SUDO $COMPOSE_CMD -f docker-compose.prod.yml up --build -d
+          $SUDO docker image prune -f
           
           echo "Deployment successful!"
