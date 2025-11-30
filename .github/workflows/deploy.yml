@@ -46,6 +46,8 @@ jobs:
         key: ${{ secrets.AWS_SSH_KEY }}
         port: 22
         debug: true
+        timeout: 30s
+        command_timeout: 30m
         script: |
           set -e # Stop script on error
           
