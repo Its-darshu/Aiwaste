@@ -30,12 +30,22 @@ class User(Base):
     reports = relationship("Report", back_populates="owner", foreign_keys="[Report.owner_id]")
     tasks = relationship("Report", back_populates="worker", foreign_keys="[Report.worker_id]")
 
+class ReportMedia(Base):
+    __tablename__ = "report_media"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_id = Column(Integer, ForeignKey("reports.id"))
+    file_url = Column(String)
+    media_type = Column(String) # "image" or "video"
+    
+    report = relationship("Report", back_populates="media")
+
 class Report(Base):
     __tablename__ = "reports"
 
     id = Column(Integer, primary_key=True, index=True)
     description = Column(String)
-    image_url = Column(String) # Path to the uploaded image
+    image_url = Column(String) # Path to the uploaded image (kept for backward compatibility, or primary image)
     latitude = Column(Float)
     longitude = Column(Float)
     address = Column(String, nullable=True)
@@ -50,6 +60,7 @@ class Report(Base):
     
     owner = relationship("User", back_populates="reports", foreign_keys=[owner_id])
     worker = relationship("User", back_populates="tasks", foreign_keys=[worker_id])
+    media = relationship("ReportMedia", back_populates="report", cascade="all, delete-orphan")
     
     cleanup_image_url = Column(String, nullable=True)
     cleanup_time = Column(DateTime, nullable=True)

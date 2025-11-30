@@ -36,6 +36,14 @@ class ReportBase(BaseModel):
 class ReportCreate(ReportBase):
     pass
 
+class ReportMedia(BaseModel):
+    id: int
+    file_url: str
+    media_type: str
+    
+    class Config:
+        from_attributes = True
+
 class Report(ReportBase):
     id: int
     complaint_id: Optional[str] = None
@@ -46,6 +54,7 @@ class Report(ReportBase):
     worker_id: Optional[int] = None
     cleanup_image_url: Optional[str] = None
     cleanup_time: Optional[datetime] = None
+    media: list[ReportMedia] = []
 
     class Config:
         from_attributes = True

@@ -48,7 +48,7 @@ const UserDashboard = () => {
   
   // Report Form State
   const [description, setDescription] = useState('');
-  const [image, setImage] = useState(null);
+  const [mediaFiles, setMediaFiles] = useState([]);
   const [location, setLocation] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
@@ -101,7 +101,6 @@ const UserDashboard = () => {
   const startCamera = async () => {
     setShowCamera(true);
     isCapturingRef.current = true;
-    setImage(null);
     setMessage('');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -199,16 +198,27 @@ const UserDashboard = () => {
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob((blob) => {
-      const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
-      setImage(file);
+      const file = new File([blob], `capture_${Date.now()}.jpg`, { type: "image/jpeg" });
+      setMediaFiles(prev => [...prev, file]);
       stopCamera();
     }, 'image/jpeg');
   };
 
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setMediaFiles(prev => [...prev, ...filesArray]);
+    }
+  };
+
+  const removeFile = (index) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!image || !location) {
-      setMessage("Please provide an image and ensure location is enabled.");
+    if (mediaFiles.length === 0 || !location) {
+      setMessage("Please provide at least one image/video and ensure location is enabled.");
       return;
     }
 
@@ -218,13 +228,16 @@ const UserDashboard = () => {
     formData.append('latitude', location.latitude);
     formData.append('longitude', location.longitude);
     if (location.address) formData.append('address', location.address);
-    formData.append('file', image);
+    
+    mediaFiles.forEach((file) => {
+      formData.append('files', file);
+    });
 
     try {
       await client.post('/reports/', formData);
       setMessage("Report submitted successfully!");
       setDescription('');
-      setImage(null);
+      setMediaFiles([]);
       setShowReportModal(false);
       fetchReports();
     } catch (error) {
@@ -478,20 +491,61 @@ const UserDashboard = () => {
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Photo Evidence</label>
                 
-                {!showCamera && !image && (
-                  <button 
-                    type="button"
-                    onClick={startCamera}
-                    className="w-full bg-emerald-50 border-2 border-dashed border-emerald-200 rounded-2xl p-8 flex flex-col items-center justify-center hover:bg-emerald-100 transition-colors group"
-                  >
-                    <div className="bg-white p-4 rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
+                {!showCamera && (
+                  <div className="space-y-4">
+                    <div className="flex space-x-2">
+                        <button 
+                            type="button"
+                            onClick={startCamera}
+                            className="flex-1 bg-emerald-50 border-2 border-dashed border-emerald-200 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-emerald-100 transition-colors group"
+                        >
+                            <div className="bg-white p-2 rounded-full shadow-sm mb-2 group-hover:scale-110 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </div>
+                            <span className="font-bold text-emerald-700 text-sm">Take Photo</span>
+                        </button>
+                        
+                        <label className="flex-1 bg-blue-50 border-2 border-dashed border-blue-200 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-blue-100 transition-colors group cursor-pointer">
+                            <input 
+                                type="file" 
+                                multiple 
+                                accept="image/*,video/*" 
+                                onChange={handleFileChange} 
+                                className="hidden" 
+                            />
+                            <div className="bg-white p-2 rounded-full shadow-sm mb-2 group-hover:scale-110 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            </div>
+                            <span className="font-bold text-blue-700 text-sm">Upload Files</span>
+                        </label>
                     </div>
-                    <span className="font-bold text-emerald-700">Tap to take photo</span>
-                  </button>
+
+                    {mediaFiles.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2">
+                            {mediaFiles.map((file, index) => (
+                                <div key={index} className="relative group">
+                                    {file.type.startsWith('video') ? (
+                                        <video src={URL.createObjectURL(file)} className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+                                    ) : (
+                                        <img src={URL.createObjectURL(file)} alt="Preview" className="w-full h-20 object-cover rounded-lg border border-gray-200" />
+                                    )}
+                                    <button 
+                                        type="button"
+                                        onClick={() => removeFile(index)}
+                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                                    >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                  </div>
                 )}
 
                 {showCamera && (
@@ -515,19 +569,6 @@ const UserDashboard = () => {
                         <div className="h-16 w-16 bg-white rounded-full"></div>
                       </button>
                     </div>
-                  </div>
-                )}
-
-                {image && (
-                  <div className="relative group">
-                    <img src={URL.createObjectURL(image)} alt="Captured" className="w-full h-64 object-cover rounded-2xl shadow-md" />
-                    <button 
-                      type="button"
-                      onClick={() => setImage(null)}
-                      className="absolute top-3 right-3 bg-white/90 text-red-500 p-2 rounded-full shadow-lg hover:bg-red-50 transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
                   </div>
                 )}
               </div>
