@@ -46,6 +46,10 @@ jobs:
           # 1. Find the project directory
           # Try common locations or assume home directory contains the repo name
           TARGET_DIR=""
+          # Debug: List directories in Home to help troubleshoot
+          echo "Listing directories in $HOME:"
+          ls -d $HOME/*/ || echo "No directories found in $HOME"
+          
           for dir in "$HOME/waste" "$HOME/Aiwaste" "/var/www/waste" "/var/www/Aiwaste"; do
             if [ -d "$dir" ]; then
               TARGET_DIR="$dir"
@@ -53,8 +57,17 @@ jobs:
             fi
           done
           
+          # Fallback: Try to find directory containing docker-compose.prod.yml
           if [ -z "$TARGET_DIR" ]; then
-            echo "Error: Could not find project directory. Please ensure the repo is cloned in $HOME/waste or similar."
+             echo "Standard paths failed. Searching for docker-compose.prod.yml..."
+             FOUND_PATH=$(find $HOME -name "docker-compose.prod.yml" -print -quit)
+             if [ -n "$FOUND_PATH" ]; then
+               TARGET_DIR=$(dirname "$FOUND_PATH")
+             fi
+          fi
+          
+          if [ -z "$TARGET_DIR" ]; then
+            echo "Error: Could not find project directory. Please ensure the repo is cloned."
             exit 1
           fi
           
