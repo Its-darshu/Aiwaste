@@ -117,3 +117,27 @@ def review_report(
     db.commit()
     db.refresh(report)
     return report
+
+@router.delete("/reports/{report_id}")
+def delete_report(
+    report_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    report = db.query(models.Report).filter(models.Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    # Optional: Delete the image file associated with the report
+    if report.image_url and os.path.exists(report.image_url):
+        try:
+            os.remove(report.image_url)
+        except Exception as e:
+            print(f"Error deleting file {report.image_url}: {e}")
+
+    db.delete(report)
+    db.commit()
+    return {"message": "Report deleted successfully"}

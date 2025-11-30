@@ -86,6 +86,17 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteReport = async (reportId) => {
+    if (window.confirm("Are you sure you want to delete this report?")) {
+      try {
+        await client.delete(`/reports/${reportId}`);
+        fetchData();
+      } catch (error) {
+        console.error("Failed to delete report", error);
+      }
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       {notifications.length > 0 && (
@@ -151,6 +162,7 @@ const AdminDashboard = () => {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -174,6 +186,14 @@ const AdminDashboard = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {report.worker_id ? workers.find(w => w.id === report.worker_id)?.full_name || 'Unknown' : 'Unassigned'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button
+                                onClick={() => handleDeleteReport(report.id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                Delete
+                              </button>
                             </td>
                           </tr>
                         ))}
