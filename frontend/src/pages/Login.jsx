@@ -2,16 +2,10 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-// Import Figma Assets
-import imgGroup3 from '../assets/figma_login_v3/228bb8e0bdd7ea42ed6715e941c02a9bfa19294d.svg';
-import imgVector22 from '../assets/figma_login_v3/b899c208f676befe91abc2a6be1a1fb85c43a207.svg';
-import imgVector21 from '../assets/figma_login_v3/d32752c5defb7c3b1188b16dd2c0d0c4d0c1877e.svg';
-import imgVector5 from '../assets/figma_login_v3/d4ed38ad759bd1e276594229b14a80b35951b7a0.svg';
-
 const Login = () => {
   const { login, signup } = useAuth();
   const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true); // Default to Login
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -41,112 +35,119 @@ const Login = () => {
     }
   };
 
-  const toggleMode = () => {
-    setIsLogin(!isLogin);
-    setError('');
-  };
-
   return (
-    <div className="min-h-screen w-full relative overflow-hidden bg-gradient-to-br from-[#4e9b4d] to-[#8bc34a] flex items-center justify-center">
-      
-      {/* --- Figma Background Assets (Desktop Layout) --- */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-         {/* Main Background Group - The large organic shape */}
-         <div className="absolute h-[798px] w-[782px] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20 mix-blend-overlay">
-            <img src={imgGroup3} alt="" className="w-full h-full object-contain" />
-         </div>
-
-         {/* Decorative Vectors - Positioned relatively to viewport or card */}
-         <div className="absolute right-[10%] bottom-[10%] w-[167px] h-[130px] rotate-[330deg] hidden md:block opacity-40">
-            <img src={imgVector22} alt="" className="w-full h-full invert brightness-0" />
-         </div>
-         
-         <div className="absolute left-[30%] bottom-[-5%] w-[73px] h-[51px] hidden md:block opacity-40">
-            <img src={imgVector21} alt="" className="w-full h-full invert brightness-0" />
-         </div>
-
-         <div className="absolute right-[5%] top-[40%] w-[110px] h-[189px] rotate-180 scale-y-[-1] hidden md:block opacity-40">
-            <img src={imgVector5} alt="" className="w-full h-full invert brightness-0" />
-         </div>
-      </div>
-
-      {/* Main Card */}
-      <div className="relative z-10 bg-white/20 backdrop-blur-md p-8 rounded-[37px] shadow-2xl w-full max-w-[484px] mx-4 border border-white/30">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            {isLogin ? 'Sign in to your account' : 'Create new account'}
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            {isLogin ? 'Welcome back to EcoSnap' : 'Join the waste management revolution'}
+          </p>
+        </div>
         
-        <h2 className="text-3xl font-bold mb-8 text-center text-gray-800 font-sans">
-          {isLogin ? 'Welcome Back' : 'Create Account'}
-        </h2>
-
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6 text-sm">
-            {error}
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+            <div className="flex">
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {!isLogin && (
-            <div className="relative">
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md shadow-sm space-y-4">
+            {!isLogin && (
+              <div>
+                <label htmlFor="fullName" className="sr-only">Full Name</label>
+                <input
+                  id="fullName"
+                  name="fullName"
+                  type="text"
+                  required
+                  className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                  placeholder="Full Name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
+              </div>
+            )}
+            
+            <div>
+              <label htmlFor="email-address" className="sr-only">{isLogin ? 'Email or Phone' : 'Email address'}</label>
               <input
-                type="text"
-                placeholder="Name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full h-[50px] px-4 border border-gray-600 rounded-[7px] bg-white/50 focus:outline-none focus:ring-2 focus:ring-[#2e7d32] placeholder-gray-700 text-lg font-sans"
+                id="email-address"
+                name="email"
+                type={isLogin ? "text" : "email"}
+                autoComplete="email"
                 required
+                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                placeholder={isLogin ? "Email or Phone Number" : "Email address"}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-          )}
 
-          <div className="relative">
-            <input
-              type={isLogin ? "text" : "email"}
-              placeholder={isLogin ? "Email or Phone Number" : "Email"}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-[50px] px-4 border border-gray-600 rounded-[7px] bg-white/50 focus:outline-none focus:ring-2 focus:ring-[#2e7d32] placeholder-gray-700 text-lg font-sans"
-              required
-            />
-          </div>
+            {!isLogin && (
+              <div>
+                <label htmlFor="phone" className="sr-only">Phone Number</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  required
+                  className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                  placeholder="Phone Number"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                />
+              </div>
+            )}
 
-          {!isLogin && (
-            <div className="relative">
+            <div>
+              <label htmlFor="password" className="sr-only">Password</label>
               <input
-                type="tel"
-                placeholder="Phone Number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                className="w-full h-[50px] px-4 border border-gray-600 rounded-[7px] bg-white/50 focus:outline-none focus:ring-2 focus:ring-[#2e7d32] placeholder-gray-700 text-lg font-sans"
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
                 required
+                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-          )}
-
-          <div className="relative">
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-[50px] px-4 border border-gray-600 rounded-[7px] bg-white/50 focus:outline-none focus:ring-2 focus:ring-[#2e7d32] placeholder-gray-700 text-lg font-sans"
-              required
-            />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-[50px] bg-[#4e9b4d] text-white text-2xl font-medium rounded-[7px] hover:bg-[#3d7a3c] transition-colors duration-200 flex items-center justify-center shadow-lg disabled:opacity-50 font-sans"
-          >
-            {loading ? 'Processing...' : (isLogin ? 'Login' : 'Submit')}
-          </button>
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : null}
+              {loading ? 'Processing...' : (isLogin ? 'Sign in' : 'Sign up')}
+            </button>
+          </div>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="text-center">
           <button
-            onClick={toggleMode}
-            className="text-xs text-gray-800 hover:text-white font-medium transition-colors font-sans"
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+            }}
+            className="font-medium text-green-600 hover:text-green-500"
           >
-            {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login"}
+            {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
           </button>
         </div>
       </div>
