@@ -31,6 +31,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
+    - name: Check Secrets
+      run: |
+        if [ -z "${{ secrets.AWS_HOST }}" ]; then echo "::error::AWS_HOST secret is missing!"; exit 1; fi
+        if [ -z "${{ secrets.AWS_USERNAME }}" ]; then echo "::error::AWS_USERNAME secret is missing!"; exit 1; fi
+        if [ -z "${{ secrets.AWS_SSH_KEY }}" ]; then echo "::error::AWS_SSH_KEY secret is missing!"; exit 1; fi
+        echo "All secrets appear to be present."
+
     - name: Deploy to AWS via SSH
       uses: appleboy/ssh-action@master
       with:
@@ -38,6 +45,8 @@ jobs:
         username: ${{ secrets.AWS_USERNAME }}
         key: ${{ secrets.AWS_SSH_KEY }}
         port: 22
+        debug: true
+        script_stop: true
         script: |
           set -e # Stop script on error
           
