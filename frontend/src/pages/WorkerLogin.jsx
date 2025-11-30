@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 
 const WorkerLogin = () => {
   const { qrLogin } = useAuth();
@@ -10,44 +10,64 @@ const WorkerLogin = () => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const scannerRef = useRef(null);
+  const isScanningRef = useRef(false);
 
   useEffect(() => {
-    let scanner = null;
-
     if (mode === 'scan') {
-      // Small delay to ensure DOM element exists
-      const timer = setTimeout(() => {
-        scanner = new Html5QrcodeScanner(
-          "reader",
-          { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0
-          },
-          /* verbose= */ false
-        );
-        
-        scanner.render(onScanSuccess, onScanFailure);
-      }, 100);
-
-      return () => {
-        clearTimeout(timer);
-        if (scanner) {
-          scanner.clear().catch(error => {
-            console.error("Failed to clear html5-qrcode scanner. ", error);
-          });
-        }
-      };
+      startScanner();
+    } else {
+      stopScanner();
     }
+
+    return () => {
+      stopScanner();
+    };
   }, [mode]);
 
-  const onScanSuccess = (decodedText, decodedResult) => {
-    setCode(decodedText);
-    handleLoginWithCode(decodedText);
+  const startScanner = async () => {
+    if (isScanningRef.current) return;
+
+    try {
+      const html5QrCode = new Html5Qrcode("reader");
+      scannerRef.current = html5QrCode;
+      
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 }
+        },
+        (decodedText) => {
+          onScanSuccess(decodedText);
+        },
+        (errorMessage) => {
+          // parse error, ignore it.
+        }
+      );
+      isScanningRef.current = true;
+    } catch (err) {
+      console.error("Error starting scanner", err);
+      setError("Failed to start camera. Please ensure permissions are granted.");
+    }
   };
 
-  const onScanFailure = (error) => {
-    // console.warn(`Code scan error = ${error}`);
+  const stopScanner = async () => {
+    if (scannerRef.current && isScanningRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+        isScanningRef.current = false;
+      } catch (err) {
+        console.error("Failed to stop scanner", err);
+      }
+    }
+  };
+
+  const onScanSuccess = (decodedText) => {
+    stopScanner();
+    setCode(decodedText);
+    handleLoginWithCode(decodedText);
   };
 
   const handleLoginWithCode = async (token) => {

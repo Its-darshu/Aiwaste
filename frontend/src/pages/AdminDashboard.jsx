@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import client from '../api/client';
+import { QRCodeCanvas } from 'qrcode.react';
 
 const AdminDashboard = () => {
   const [reports, setReports] = useState([]);
@@ -11,6 +12,8 @@ const AdminDashboard = () => {
   const [notifications, setNotifications] = useState([]);
   const [newWorker, setNewWorker] = useState({ email: '', password: '', full_name: '', phone_number: '' });
   const [stats, setStats] = useState({ active_complaints: 0, online_workers: 0 });
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedWorkerQR, setSelectedWorkerQR] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -273,7 +276,13 @@ const AdminDashboard = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{worker.email}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{worker.qr_login_token}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <button onClick={() => handleRegenerateQR(worker.id)} className="text-indigo-600 hover:text-indigo-900 mr-4">Regenerate QR</button>
+                              <button 
+                                onClick={() => { setSelectedWorkerQR(worker); setShowQRModal(true); }} 
+                                className="text-green-600 hover:text-green-900 mr-4"
+                              >
+                                View QR
+                              </button>
+                              <button onClick={() => handleRegenerateQR(worker.id)} className="text-indigo-600 hover:text-indigo-900 mr-4">Regenerate Token</button>
                               <button onClick={() => handleDeleteWorker(worker.id)} className="text-red-600 hover:text-red-900">Delete</button>
                             </td>
                           </tr>
@@ -283,6 +292,26 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* QR Modal */}
+        {showQRModal && selectedWorkerQR && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowQRModal(false)}>
+            <div className="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
+              <h3 className="text-xl font-bold mb-4">Worker QR Code</h3>
+              <p className="mb-4 text-gray-600">{selectedWorkerQR.full_name}</p>
+              <div className="flex justify-center mb-6">
+                <QRCodeCanvas value={selectedWorkerQR.qr_login_token} size={200} />
+              </div>
+              <p className="text-sm font-mono bg-gray-100 p-2 rounded mb-6">{selectedWorkerQR.qr_login_token}</p>
+              <button 
+                onClick={() => setShowQRModal(false)}
+                className="bg-gray-800 text-white px-6 py-2 rounded hover:bg-gray-700 w-full"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}

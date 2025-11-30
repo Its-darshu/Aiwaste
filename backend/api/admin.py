@@ -65,6 +65,15 @@ def read_all_reports(
     check_admin(current_user)
     return db.query(models.Report).all()
 
+import secrets
+import string
+
+# ... existing imports ...
+
+def generate_short_token(length=8):
+    alphabet = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
 @router.post("/admin/workers", response_model=schemas.User)
 def create_worker(user: schemas.UserCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(database.get_db)):
     check_admin(current_user)
@@ -84,8 +93,8 @@ def create_worker(user: schemas.UserCreate, current_user: models.User = Depends(
         phone_number = None
     
     hashed_password = get_password_hash(user.password)
-    # Generate QR token
-    qr_token = str(uuid.uuid4())
+    # Generate QR token (Short, fixed length)
+    qr_token = generate_short_token()
     
     db_user = models.User(
         email=user.email,
@@ -133,7 +142,7 @@ def regenerate_qr(worker_id: int, current_user: models.User = Depends(get_curren
     if not worker:
         raise HTTPException(status_code=404, detail="Worker not found")
     
-    worker.qr_login_token = str(uuid.uuid4())
+    worker.qr_login_token = generate_short_token()
     db.commit()
     db.refresh(worker)
     return worker
