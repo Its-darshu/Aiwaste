@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 const WorkerLogin = () => {
   const { qrLogin } = useAuth();
@@ -10,18 +11,60 @@ const WorkerLogin = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    let scanner = null;
+
+    if (mode === 'scan') {
+      // Small delay to ensure DOM element exists
+      const timer = setTimeout(() => {
+        scanner = new Html5QrcodeScanner(
+          "reader",
+          { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0
+          },
+          /* verbose= */ false
+        );
+        
+        scanner.render(onScanSuccess, onScanFailure);
+      }, 100);
+
+      return () => {
+        clearTimeout(timer);
+        if (scanner) {
+          scanner.clear().catch(error => {
+            console.error("Failed to clear html5-qrcode scanner. ", error);
+          });
+        }
+      };
+    }
+  }, [mode]);
+
+  const onScanSuccess = (decodedText, decodedResult) => {
+    setCode(decodedText);
+    handleLoginWithCode(decodedText);
+  };
+
+  const onScanFailure = (error) => {
+    // console.warn(`Code scan error = ${error}`);
+  };
+
+  const handleLoginWithCode = async (token) => {
     setError('');
     setLoading(true);
     try {
-      await qrLogin(code);
+      await qrLogin(token);
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed');
-    } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    handleLoginWithCode(code);
   };
 
   return (
@@ -52,17 +95,25 @@ const WorkerLogin = () => {
 
         {mode === 'scan' ? (
           <div className="text-center">
-            <div className="bg-gray-200 h-48 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-gray-500">Camera View (Simulation)</span>
-            </div>
+            <div id="reader" className="w-full overflow-hidden rounded-lg mb-4"></div>
             <p className="text-sm text-gray-600 mb-4">Point your camera at the QR code</p>
-            {/* Simulation input for scan result */}
+            
+            {/* Fallback/Manual entry in scan mode if needed */}
+            <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-gray-500">Or enter manually</span>
+                </div>
+            </div>
+
             <input
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="Simulate Scan Result (Enter Token)"
-              className="w-full px-3 py-2 border rounded-lg mb-4"
+              placeholder="Enter Token Manually"
+              className="w-full px-3 py-2 border rounded-lg mt-4 mb-4"
             />
             <button
               onClick={handleLogin}
