@@ -21,6 +21,16 @@ except Exception as e:
     # Column likely exists
     pass
 
+# Migration: Add qr_login_token column to users if not exists
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN qr_login_token VARCHAR"))
+        conn.execute(text("CREATE UNIQUE INDEX ix_users_qr_login_token ON users (qr_login_token)"))
+        print("Migrated: Added qr_login_token column")
+except Exception as e:
+    # Column likely exists
+    pass
+
 app = FastAPI(title="Smart Waste Management System")
 
 # Mount uploads directory
