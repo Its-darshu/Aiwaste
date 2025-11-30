@@ -39,6 +39,7 @@ class Report(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     address = Column(String, nullable=True)
+    complaint_id = Column(String, unique=True, index=True, nullable=True)
     status = Column(String, default=ReportStatus.PENDING)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     cleanup_image_url = Column(String, nullable=True)

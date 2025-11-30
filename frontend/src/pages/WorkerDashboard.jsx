@@ -192,6 +192,7 @@ const WorkerDashboard = () => {
             {/* Content */}
             <div className="flex-1 p-3 flex flex-col justify-between">
               <div>
+                {task.complaint_id && <div className="text-[10px] font-mono text-gray-400 mb-0.5">#{task.complaint_id}</div>}
                 <h3 className="font-bold text-gray-800 line-clamp-1">{task.description}</h3>
                 <p className="text-xs text-gray-500 mt-1 flex items-center">
                   <MapPinIcon />
@@ -291,6 +292,7 @@ const WorkerDashboard = () => {
         <div className="flex-1 p-6 bg-white -mt-6 rounded-t-[30px] relative z-20 flex flex-col">
           <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
           
+          {selectedTask.complaint_id && <div className="text-xs font-mono text-gray-400 mb-1">#{selectedTask.complaint_id}</div>}
           <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedTask.description}</h2>
           <p className="text-gray-500 mb-6 flex items-center">
             <MapPinIcon />

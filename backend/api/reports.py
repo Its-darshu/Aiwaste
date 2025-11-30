@@ -4,6 +4,8 @@ from typing import List
 import shutil
 import os
 import uuid
+import random
+import string
 from .. import database, schemas
 from ..models import user as models
 from ..services.ai import ai_service
@@ -46,13 +48,26 @@ async def create_report(
             os.remove(file_location)
             raise HTTPException(status_code=400, detail="No garbage detected in the image.")
         
+        # Generate Complaint ID
+        # Extract first 3 chars of first word, uppercase
+        prefix = description.split()[0][:3].upper() if description else "CMP"
+        # Ensure alphanumeric
+        prefix = "".join(c for c in prefix if c.isalnum())
+        # Pad if too short
+        if len(prefix) < 3:
+            prefix = (prefix + "XXX")[:3]
+            
+        suffix = ''.join(random.choices(string.digits, k=5))
+        complaint_id = f"{prefix}-{suffix}"
+
         db_report = models.Report(
             description=description,
             latitude=latitude,
             longitude=longitude,
             address=address,
             image_url=file_location,
-            owner_id=current_user.id
+            owner_id=current_user.id,
+            complaint_id=complaint_id
         )
         db.add(db_report)
         db.commit()

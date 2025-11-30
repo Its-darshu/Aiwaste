@@ -38,6 +38,7 @@ class ReportCreate(ReportBase):
 
 class Report(ReportBase):
     id: int
+    complaint_id: Optional[str] = None
     image_url: str
     status: ReportStatus
     created_at: datetime

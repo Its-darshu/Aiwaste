@@ -331,7 +331,14 @@ const UserDashboard = () => {
                     <div className="flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex justify-between items-start">
-                          <h3 className="font-bold text-gray-800 line-clamp-1">{report.description || "Waste Report"}</h3>
+                          <div>
+                            {report.complaint_id && (
+                              <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded mb-1 inline-block">
+                                #{report.complaint_id}
+                              </span>
+                            )}
+                            <h3 className="font-bold text-gray-800 line-clamp-1">{report.description || "Waste Report"}</h3>
+                          </div>
                           <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${
                             report.status === 'cleaned' ? 'bg-emerald-100 text-emerald-700' : 
                             report.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'
