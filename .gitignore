@@ -20,6 +20,7 @@ Thumbs.db
 
 # Databases, uploads and other generated files
 waste.db
+*.db
 uploads/
 ai_service/dataset/
 backend/__pycache__/
