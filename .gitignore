@@ -27,6 +27,7 @@ backend/__pycache__/
 frontend/node_modules/
 
 # Frontend dev artifacts
+node_modules/
 frontend/dist/
 frontend/build/
 frontend/.env.local

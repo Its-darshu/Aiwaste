@@ -12,6 +12,9 @@ const Navigation = () => {
   const { user, logout } = useAuth();
 
   if (!user) return null;
+  
+  // Hide global navigation for regular users as they have their own mobile-style nav
+  if (user.role === 'user') return null;
 
   return (
     <nav className="bg-gray-800">

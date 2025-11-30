@@ -11,3 +11,4 @@ tensorflow
 pillow
 geopy
 email-validator
+boto3

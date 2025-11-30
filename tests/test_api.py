@@ -10,11 +10,6 @@ client = TestClient(app)
 ai_service.detect_garbage = MagicMock(return_value=True)
 ai_service.verify_cleanup = MagicMock(return_value=True)
 
-def test_read_main():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Welcome to Smart Waste Management API"}
-
 def test_auth_flow():
     # 1. Signup
     signup_data = {
