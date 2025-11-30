@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import shutil
 import os
+import uuid
 from .. import database, schemas
 from ..models import user as models
 from ..services.ai import ai_service
@@ -31,38 +32,73 @@ async def create_report(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
-    # Save the file
-    file_location = f"{UPLOAD_DIR}/{file.filename}"
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Save the file with a unique name
+    file_ext = os.path.splitext(file.filename)[1]
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    file_location = f"{UPLOAD_DIR}/{unique_filename}"
     
-    # AI Verification
-    if not ai_service.detect_garbage(file_location):
-        os.remove(file_location)
-        raise HTTPException(status_code=400, detail="No garbage detected in the image.")
-    
-    db_report = models.Report(
-        description=description,
-        latitude=latitude,
-        longitude=longitude,
-        address=address,
-        image_url=file_location,
-        owner_id=current_user.id
-    )
-    db.add(db_report)
-    db.commit()
-    db.refresh(db_report)
-    
-    await manager.broadcast(f"New Task Available: {description}")
-    log_activity(db, "CREATE_REPORT", f"User {current_user.email} created report {db_report.id}", current_user.id)
-    
-    return db_report
+    try:
+        with open(file_location, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # AI Verification
+        if not ai_service.detect_garbage(file_location):
+            os.remove(file_location)
+            raise HTTPException(status_code=400, detail="No garbage detected in the image.")
+        
+        db_report = models.Report(
+            description=description,
+            latitude=latitude,
+            longitude=longitude,
+            address=address,
+            image_url=file_location,
+            owner_id=current_user.id
+        )
+        db.add(db_report)
+        db.commit()
+        db.refresh(db_report)
+        
+        await manager.broadcast(f"New Task Available: {description}")
+        log_activity(db, "CREATE_REPORT", f"User {current_user.email} created report {db_report.id}", current_user.id)
+        
+        return db_report
+    except Exception as e:
+        # Cleanup if something fails and file exists
+        if os.path.exists(file_location) and "db_report" not in locals():
+             os.remove(file_location)
+        raise e
 
 @router.get("/reports/", response_model=List[schemas.Report])
-def read_reports(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
+def read_reports(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != models.UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Not authorized")
     reports = db.query(models.Report).offset(skip).limit(limit).all()
     return reports
 
 @router.get("/reports/my", response_model=List[schemas.Report])
 def read_my_reports(current_user: models.User = Depends(get_current_user), db: Session = Depends(database.get_db)):
     return current_user.reports
+
+@router.put("/reports/{report_id}/review", response_model=schemas.Report)
+def review_report(
+    report_id: int, 
+    status: models.ReportStatus, 
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(database.get_db)
+):
+    if current_user.role not in [models.UserRole.WORKER, models.UserRole.ADMIN]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    report = db.query(models.Report).filter(models.Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    report.status = status
+    db.commit()
+    db.refresh(report)
+    return report

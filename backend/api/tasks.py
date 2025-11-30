@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import shutil
 import os
+import uuid
 import datetime
 from .. import database, schemas
 from ..models import user as models
@@ -10,6 +11,7 @@ from ..services.ai import ai_service
 from ..services.websocket import manager
 from ..services.activity import log_activity
 from .auth import get_current_user
+import math
 
 router = APIRouter()
 
@@ -51,9 +53,6 @@ async def claim_task(
     
     return report
 
-
-import math
-
 def calculate_distance(lat1, lon1, lat2, lon2):
     R = 6371e3 # Earth radius in meters
     phi1 = lat1 * math.pi / 180
@@ -92,24 +91,32 @@ async def complete_task(
     if distance > 200: # 200 meters radius
         raise HTTPException(status_code=400, detail=f"Location mismatch. You are {int(distance)}m away from the task location.")
 
-    # Save the file
-    file_location = f"uploads/cleanup_{file.filename}"
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Save the file with a unique name
+    file_ext = os.path.splitext(file.filename)[1]
+    unique_filename = f"cleanup_{uuid.uuid4()}{file_ext}"
+    file_location = f"uploads/{unique_filename}"
     
-    # AI Verification
-    if not ai_service.verify_cleanup(report.image_url, file_location):
-        os.remove(file_location)
-        raise HTTPException(status_code=400, detail="Cleanup verification failed. Garbage still detected.")
-    
-    report.cleanup_image_url = file_location
-    report.cleanup_time = datetime.datetime.utcnow()
-    report.status = models.ReportStatus.CLEANED
-    
-    db.commit()
-    db.refresh(report)
-    
-    await manager.broadcast(f"Task #{report.id} completed by {current_user.full_name}")
-    log_activity(db, "COMPLETE_TASK", f"Worker {current_user.email} completed task {report.id}", current_user.id)
-    
-    return report
+    try:
+        with open(file_location, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # AI Verification
+        if not ai_service.verify_cleanup(report.image_url, file_location):
+            os.remove(file_location)
+            raise HTTPException(status_code=400, detail="Cleanup verification failed. Garbage still detected.")
+        
+        report.cleanup_image_url = file_location
+        report.cleanup_time = datetime.datetime.utcnow()
+        report.status = models.ReportStatus.CLEANED
+        
+        db.commit()
+        db.refresh(report)
+        
+        await manager.broadcast(f"Task #{report.id} completed by {current_user.full_name}")
+        log_activity(db, "COMPLETE_TASK", f"Worker {current_user.email} completed task {report.id}", current_user.id)
+        
+        return report
+    except Exception as e:
+        if os.path.exists(file_location) and report.status != models.ReportStatus.CLEANED:
+             os.remove(file_location)
+        raise e
