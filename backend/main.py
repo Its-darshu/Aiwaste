@@ -6,9 +6,20 @@ from fastapi.staticfiles import StaticFiles
 from .api import auth, reports, tasks, admin
 from .services.websocket import manager
 import os
+from sqlalchemy import text
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Migration: Add complaint_id column if not exists
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE reports ADD COLUMN complaint_id VARCHAR"))
+        conn.execute(text("CREATE UNIQUE INDEX ix_reports_complaint_id ON reports (complaint_id)"))
+        print("Migrated: Added complaint_id column")
+except Exception as e:
+    # Column likely exists
+    pass
 
 app = FastAPI(title="Smart Waste Management System")
 
