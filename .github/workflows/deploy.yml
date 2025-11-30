@@ -40,6 +40,9 @@ jobs:
 
     - name: Deploy to AWS via SSH
       uses: appleboy/ssh-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
       with:
         host: ${{ secrets.AWS_HOST }}
         username: ${{ secrets.AWS_USERNAME }}
@@ -48,29 +51,32 @@ jobs:
         debug: true
         timeout: 60s
         command_timeout: 30m
+        envs: GITHUB_TOKEN,GITHUB_REPOSITORY
         script: |
           set -e
           
           # Configuration
-          REPO_URL="https://github.com/${{ github.repository }}.git"
+          # Use the GITHUB_TOKEN to authenticate git operations
+          REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           PROJECT_DIR="$HOME/Aiwaste"
           
           echo "Starting deployment to $PROJECT_DIR..."
           
-          # 1. Ensure Project Directory Exists
+          # 1. Ensure Project Directory Exists & Update Code
           if [ -d "$PROJECT_DIR" ]; then
             echo "Directory exists. Updating..."
             cd "$PROJECT_DIR"
             
-            # Handle 'dubious ownership' if permissions are mixed
+            # Handle 'dubious ownership'
             git config --global --add safe.directory "$PROJECT_DIR" || true
             
-            # Reset any local changes
+            # Update remote to use the token (ensures we can fetch even if SSH keys are missing)
+            git remote set-url origin "$REPO_URL"
+            
             git fetch origin
             git reset --hard origin/main
           else
             echo "Directory not found. Cloning..."
-            # Try cloning. If this is a private repo, this might fail without credentials.
             git clone "$REPO_URL" "$PROJECT_DIR"
             cd "$PROJECT_DIR"
           fi
@@ -83,7 +89,6 @@ jobs:
           fi
           
           # 3. Determine Sudo Usage
-          # Check if we can run docker without sudo
           if docker info > /dev/null 2>&1; then
             SUDO=""
             echo "Running Docker as current user."
