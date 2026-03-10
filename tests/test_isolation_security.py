@@ -52,7 +52,7 @@ def test_isolation_and_security():
                 "latitude": 10.0,
                 "longitude": 20.0
             },
-            files={"file": ("test_image.jpg", f, "image/jpeg")}
+            files={"files": ("test_image.jpg", f, "image/jpeg")}
         )
     assert response.status_code == 200
     report_a = response.json()

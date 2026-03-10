@@ -70,7 +70,7 @@ def test_report_flow():
     # Create Report
     # We need to upload a file
     # Create a dummy file content
-    files = {"file": ("test.jpg", b"fake image content", "image/jpeg")}
+    files = {"files": ("test.jpg", b"fake image content", "image/jpeg")}
     data = {
         "description": "Test Garbage",
         "latitude": "12.9716",
